@@ -1,0 +1,19 @@
+{
+  "name": "purescript-nasa-images",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "output"
+  ],
+  "dependencies": {
+    "purescript-prelude": "^3.1.1",
+    "purescript-console": "^3.0.0",
+    "purescript-affjax": "^5.0.0",
+    "purescript-polyform": "^0.6.1",
+    "purescript-foreign": "^4.0.1"
+  },
+  "devDependencies": {
+    "purescript-psci-support": "^3.0.0"
+  }
+}
