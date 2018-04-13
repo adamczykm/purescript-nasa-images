@@ -29,6 +29,7 @@ newtype SearchItem = SearchItem
   , description :: String
   , keywords :: Array String
   , nasaId :: String
+  , collection :: String
   }
 
 derive instance genericSearchItem :: Generic SearchItem
