@@ -2,15 +2,17 @@ module Main where
 
 import Prelude
 
-import API.NasaImages (SearchRequest(..))
-import API.NasaImages.Methods (search)
+import API.NasaImages.Methods (retrieve, search, searchAndRetrieve)
+import API.NasaImages.Search (Item(..), Request(..), Result(..))
 import Control.Monad.Aff (launchAff)
 import Control.Monad.Aff.Console (logShow)
+import Control.Parallel (parTraverse)
 import Data.Maybe (Maybe(..))
-import Polyform.Validation (V(..))
+import Data.Traversable (sequence, traverse)
+import Polyform.Validation (V(..), runValidation)
 
-example :: SearchRequest
-example = SearchRequest
+example :: Request
+example = Request
   { q : Just "apollo 11"
   , description : Just "moon landing"
   , keywords : []
@@ -18,7 +20,7 @@ example = SearchRequest
 
 main :: _
 main = launchAff $ do
-  v <- search example
+  v <- runValidation searchAndRetrieve example
   case v of
     Invalid e -> logShow e
-    Valid _ v -> logShow v
+    Valid _ r -> logShow r
