@@ -10,7 +10,7 @@ import Data.Record.ShowRecord (showRecord)
 import Data.Tuple (Tuple(..))
 
 newtype Request = Request
-  { q :: Maybe String
+  { query :: Maybe String
   , description :: Maybe String
   , keywords :: Array String
   }
@@ -30,7 +30,7 @@ newtype Item c = Item
   , description :: String
   , keywords :: Array String
   , nasaId :: String
-  , collection :: c
+  , asset :: c
   }
 
 derive instance newtypeItem :: Newtype (Item c) _
@@ -44,7 +44,7 @@ instance showSearchResult :: Show c => Show (Result c) where show = unwrap >>> s
 
 toUrlEncoded :: Request -> FormURLEncoded
 toUrlEncoded (Request req) = fromArray
-  [ Tuple "q" req.q
+  [ Tuple "q" req.query
   , Tuple "description" req.description
   , Tuple "keywords" (case intercalate "," req.keywords of
     "" -> Nothing

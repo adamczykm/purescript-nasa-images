@@ -33,7 +33,6 @@ retrieve = hoistFnMV $ \url -> do
 searchAndRetrieve :: forall e. Validation (Aff (ajax :: AJAX | e)) (Array String) Request (Result (Asset Unit))
 searchAndRetrieve = search >>> (hoistFnMV $ \(Result r) -> do
   assets <- sequence <$> parTraverse (\(Item i) -> do
-    asset <- runValidation retrieve i.collection
-    pure $ Item <$> (i { collection = _ }) <$> asset) r.items
-  pure $ (\arr -> Result $ r { items = arr }) <$> assets
-)
+    asset <- runValidation retrieve i.asset
+    pure $ Item <$> (i { asset = _ }) <$> asset) r.items
+  pure $ (\arr -> Result $ r { items = arr }) <$> assets)

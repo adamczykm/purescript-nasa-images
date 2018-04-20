@@ -26,7 +26,7 @@ metadata = Metadata <$> (collect { "totalHits": field "total_hits" int })
 
 searchItem :: forall m. Monad m => JsValidation m (Item String)
 searchItem = Item <$> (
-  insert (SProxy :: SProxy "collection") <$>
+  insert (SProxy :: SProxy "asset") <$>
     (field "href" string) <*>
     (field "data" $ elem 0 $ collect
       { title: field "title" string

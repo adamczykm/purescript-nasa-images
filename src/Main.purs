@@ -13,7 +13,7 @@ import Polyform.Validation (V(..), runValidation)
 
 example :: Request
 example = Request
-  { q : Just "apollo 11"
+  { query : Just "apollo 11"
   , description : Just "moon landing"
   , keywords : []
   }
