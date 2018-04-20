@@ -2,18 +2,20 @@ module API.NasaImages.Methods where
 
 import Prelude
 
-import API.NasaImages.Asset (Asset)
+import API.NasaImages.Asset (Asset, withDimensions)
 import API.NasaImages.Search (Item(..), Request, Result(..), toUrlEncoded)
-import API.NasaImages.Validation (asset, searchResult, stringifyErrs)
+import API.NasaImages.Validation (asset, dimensions, findStr, searchResult, stringifyErrs)
 import Control.Monad.Aff (Aff)
 import Control.Parallel (parTraverse)
 import Data.Either (Either(..))
 import Data.FormURLEncoded (encode)
 import Data.HTTP.Method (Method(..))
+import Data.Maybe (Maybe(..))
+import Data.Record.Fold (rMap)
 import Data.Traversable (sequence)
 import Network.HTTP.Affjax (AJAX, AffjaxRequest, affjax, defaultRequest, get)
-import Polyform.Validation (Validation, hoistFnMV, runValidation)
-import Validators.Json (field)
+import Polyform.Validation (V(..), Validation, hoistFnMV, hoistFnV, runValidation)
+import Validators.Json (arrayOf, field, string)
 
 buildRequest :: Request -> AffjaxRequest Unit
 buildRequest r = 
@@ -25,12 +27,28 @@ search = hoistFnMV $ \r -> do
   resp <- affjax (buildRequest r)
   runValidation (stringifyErrs $ field "collection" searchResult) resp.response
 
-retrieve :: forall e. Validation (Aff (ajax :: AJAX | e)) (Array String) String (Asset Unit)
+getDimensions
+  :: forall e
+   . Validation (Aff (ajax :: AJAX | e)) (Array String) String { width :: Int, height :: Int }
+getDimensions = hoistFnMV $ \url -> do
+  resp <- get url
+  runValidation (stringifyErrs $ dimensions) resp.response
+
+retrieve :: forall e. Validation (Aff (ajax :: AJAX | e)) (Array String) String (Asset (Maybe Int))
 retrieve = hoistFnMV $ \url -> do
   resp <- get url
-  runValidation asset resp.response
+  links <- runValidation (arrayOf string # stringifyErrs) resp.response
+  dimensions <- runValidation (hoistFnV (const links) >>> findStr "metadata" >>> getDimensions) unit
+  let 
+    dims = case dimensions of
+      Invalid _ -> { width: Nothing, height: Nothing }
+      Valid _ v -> rMap Just v
+  a <- runValidation (hoistFnV (const links) >>> asset) unit
+  pure $ withDimensions dims <$> a
 
-searchAndRetrieve :: forall e. Validation (Aff (ajax :: AJAX | e)) (Array String) Request (Result (Asset Unit))
+searchAndRetrieve
+  :: forall e
+   . Validation (Aff (ajax :: AJAX | e)) (Array String) Request (Result (Asset (Maybe Int)))
 searchAndRetrieve = search >>> (hoistFnMV $ \(Result r) -> do
   assets <- sequence <$> parTraverse (\(Item i) -> do
     asset <- runValidation retrieve i.asset

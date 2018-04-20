@@ -20,3 +20,9 @@ newtype Asset dim = Asset
 
 instance showAsset :: Show dim => Show (Asset dim) where
   show (Asset r) = showRecord r
+
+withDimensions :: forall a b. { width :: b, height :: b } -> Asset a -> Asset b
+withDimensions { width, height } (Asset a) =
+  let
+    Image img = a.original
+  in Asset $ a { original = Image (img { width = width, height = height }) }

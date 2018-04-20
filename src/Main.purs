@@ -2,13 +2,11 @@ module Main where
 
 import Prelude
 
-import API.NasaImages.Methods (retrieve, search, searchAndRetrieve)
-import API.NasaImages.Search (Item(..), Request(..), Result(..))
+import API.NasaImages.Methods (searchAndRetrieve)
+import API.NasaImages.Search (Request(..))
 import Control.Monad.Aff (launchAff)
 import Control.Monad.Aff.Console (logShow)
-import Control.Parallel (parTraverse)
 import Data.Maybe (Maybe(..))
-import Data.Traversable (sequence, traverse)
 import Polyform.Validation (V(..), runValidation)
 
 example :: Request

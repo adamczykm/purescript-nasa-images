@@ -4,7 +4,7 @@ import Prelude
 
 import API.NasaImages.Asset (Asset(..), Image(..))
 import API.NasaImages.Search (Item(..), Metadata(..), Result(..))
-import Data.Argonaut (Json)
+import Control.Alt ((<|>))
 import Data.Foldable (find)
 import Data.Maybe (Maybe(..))
 import Data.Record (insert)
@@ -42,8 +42,23 @@ searchResult = Result <$> (collect
   , metadata: field "metadata" $ metadata
   })
 
-asset :: forall m. Monad m => Validation m (Array String) Json (Asset Unit)
-asset = (arrayOf string # stringifyErrs) >>> hoistFnV (\urls -> 
+dimensions :: forall m. Monad m => JsValidation m { width :: Int, height :: Int }
+dimensions = { width: _, height: _ } 
+  <$> ( field "EXIF:ImageWidth" int
+    <|> field "File:ImageWidth" int
+    <|> field "EXIF:ExifImageWidth" int)
+  <*> ( field "EXIF:ImageHeight" int
+    <|> field "File:ImageHeight" int
+    <|> field "EXIF:ExifImageWidth" int)
+
+findStr :: forall m. Monad m => String -> Validation m (Array String) (Array String) String
+findStr s = hoistFnV $ \arr ->
+  case find (contains $ Pattern s) arr of
+    Nothing -> Invalid [ "Could not find string containing pattern: " <> s ]
+    Just a -> pure a
+
+asset :: forall m. Monad m => Validation m (Array String) (Array String) (Asset Unit)
+asset = hoistFnV (\urls -> 
   let 
     asset = do
       orig <- find (contains $ Pattern "orig") urls
