@@ -6,7 +6,9 @@ import API.NasaImages.Methods (searchAndRetrieve)
 import API.NasaImages.Search (Request(..))
 import Control.Monad.Aff (launchAff)
 import Control.Monad.Aff.Console (logShow)
+import Data.Array (length)
 import Data.Maybe (Maybe(..))
+import Data.Newtype (unwrap)
 import Polyform.Validation (V(..), runValidation)
 
 example :: Request
@@ -21,4 +23,7 @@ main = launchAff $ do
   v <- runValidation searchAndRetrieve example
   case v of
     Invalid e -> logShow e
-    Valid _ r -> logShow r
+    Valid _ r -> do
+      logShow r
+      logShow (length $ (unwrap r).items)
+      logShow ((unwrap r).metadata)

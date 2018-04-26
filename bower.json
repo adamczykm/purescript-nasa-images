@@ -15,9 +15,11 @@
     "purescript-validators": "https://github.com/lambdaterms/purescript-validators.git",
     "purescript-strings": "^3.5.0",
     "purescript-record-show": "^0.4.0",
-    "purescript-parallel": "^3.3.1"
+    "purescript-parallel": "^3.3.1",
+    "purescript-these": "^3.1.0"
   },
   "devDependencies": {
-    "purescript-psci-support": "^3.0.0"
+    "purescript-psci-support": "^3.0.0",
+    "purescript-node-fs": "^4.0.1"
   }
 }

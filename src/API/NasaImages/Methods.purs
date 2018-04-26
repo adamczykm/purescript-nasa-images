@@ -4,7 +4,7 @@ import Prelude
 
 import API.NasaImages.Asset (Asset, withDimensions)
 import API.NasaImages.Search (Item(..), Request, Result(..), toUrlEncoded)
-import API.NasaImages.Validation (asset, dimensions, findStr, searchResult, stringifyErrs)
+import API.NasaImages.Validation (affjaxJson, asset, dimensions, findStr, searchResult, stringifyErrs)
 import Control.Monad.Aff (Aff)
 import Control.Parallel (parTraverse)
 import Data.Either (Either(..))
@@ -14,32 +14,32 @@ import Data.Maybe (Maybe(..))
 import Data.Record.Fold (rMap)
 import Data.Traversable (sequence)
 import Network.HTTP.Affjax (AJAX, AffjaxRequest, affjax, defaultRequest, get)
-import Polyform.Validation (V(..), Validation, hoistFnMV, hoistFnV, runValidation)
+import Polyform.Validation (V(Valid, Invalid), Validation, hoistFnMV, hoistFnV, runValidation)
 import Validators.Json (arrayOf, field, string)
 
 buildRequest :: Request -> AffjaxRequest Unit
-buildRequest r = 
+buildRequest r =
   let url = r # toUrlEncoded # encode
   in defaultRequest { url = "https://images-api.nasa.gov/search?" <> url, method = Left GET }
 
 search :: forall e. Validation (Aff (ajax :: AJAX | e)) (Array String) Request (Result String)
 search = hoistFnMV $ \r -> do
   resp <- affjax (buildRequest r)
-  runValidation (stringifyErrs $ field "collection" searchResult) resp.response
+  runValidation (affjaxJson >>> stringifyErrs (field "collection" searchResult)) resp
 
 getDimensions
   :: forall e
    . Validation (Aff (ajax :: AJAX | e)) (Array String) String { width :: Int, height :: Int }
 getDimensions = hoistFnMV $ \url -> do
   resp <- get url
-  runValidation (stringifyErrs $ dimensions) resp.response
+  runValidation (affjaxJson >>> stringifyErrs dimensions) resp
 
 retrieve :: forall e. Validation (Aff (ajax :: AJAX | e)) (Array String) String (Asset (Maybe Int))
 retrieve = hoistFnMV $ \url -> do
   resp <- get url
-  links <- runValidation (arrayOf string # stringifyErrs) resp.response
+  links <- runValidation (affjaxJson >>> (arrayOf string # stringifyErrs)) resp
   dimensions <- runValidation (hoistFnV (const links) >>> findStr "metadata" >>> getDimensions) unit
-  let 
+  let
     dims = case dimensions of
       Invalid _ -> { width: Nothing, height: Nothing }
       Valid _ v -> rMap Just v

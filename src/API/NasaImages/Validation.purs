@@ -5,14 +5,34 @@ import Prelude
 import API.NasaImages.Asset (Asset(..), Image(..))
 import API.NasaImages.Search (Item(..), Metadata(..), Result(..))
 import Control.Alt ((<|>))
+import Data.Argonaut (Json, jsonParser)
+import Data.Either (Either(..))
 import Data.Foldable (find)
 import Data.Maybe (Maybe(..))
 import Data.Record (insert)
 import Data.Record.Fold (collect)
 import Data.String (Pattern(..), contains)
 import Data.Symbol (SProxy(..))
-import Polyform.Validation (V(..), Validation, hoistFnV, lmapValidation)
-import Validators.Json (JsValidation, arrayOf, elem, field, int, optionalField, string)
+import Data.These (These(..))
+import Data.Tuple (Tuple(..))
+import Network.HTTP.Affjax (AffjaxResponse)
+import Network.HTTP.StatusCode (StatusCode(..))
+import Polyform.Validation (V(Invalid, Valid), Validation, hoistFnV, lmapValidation)
+import Validators.Json (JsValidation, arrayOf, elem, fail, field, int, optionalField, string)
+
+type AffjaxValidation m a = Validation m (Array String) (AffjaxResponse String) a
+type AffjaxJson m = AffjaxValidation m Json
+
+affjaxJson :: forall m. Monad m => AffjaxJson m
+affjaxJson = parseJson <<< validateStatus
+  where
+  parseJson = hoistFnV $ \response -> case jsonParser response of
+    Right json -> Valid [] json
+    Left e -> Invalid ["Json parsing error: " <> e]
+  validateStatus = hoistFnV $ \response -> case response.status of
+    StatusCode 200 -> Valid [] response.response
+    StatusCode s ->
+      Invalid ["API bad response:\n" <> show s <> "\n" <> "\"" <> response.response <> "\""]
 
 stringifyErrs
   :: forall m e a b
@@ -35,10 +55,29 @@ searchItem = Item <$> (
       , nasaId: field "nasa_id" string
       }))
 
+these
+  :: forall a b m
+   . Monad m
+  => JsValidation m a
+  -> JsValidation m b
+  -> JsValidation m (These a b)
+these vA vB
+  = Both <$> (elem 0 vA) <*> (elem 1 vB)
+  <|> This <$> elem 0 vA
+  <|> That <$> elem 0 vB
+
+pagination :: forall m. Monad m => JsValidation m (These String String)
+pagination = these (page "prev") (page "next")
+  where
+  page rel  = (Tuple <$> field "rel" string <*> field "href" string) >>> hoistFnV (case _ of
+    (Tuple r h) | r == rel -> pure h
+    (Tuple r _) -> fail ("Invalid next link rel: " <> r))
+
 searchResult :: forall m. Monad m => JsValidation m (Result String)
 searchResult = Result <$> (collect
   { href: field "href" string
   , items: field "items" $ arrayOf searchItem
+  , pagination: field "links" pagination
   , metadata: field "metadata" $ metadata
   })
 
@@ -58,12 +97,12 @@ findStr s = hoistFnV $ \arr ->
     Just a -> pure a
 
 asset :: forall m. Monad m => Validation m (Array String) (Array String) (Asset Unit)
-asset = hoistFnV (\urls -> 
-  let 
-    asset = do
+asset = hoistFnV (\urls ->
+  let
+    a = do
       orig <- find (contains $ Pattern "orig") urls
       thumb <- find (contains $ Pattern "thumb") urls
       pure $ Asset { original: Image { url: orig, width : unit, height : unit }, thumb: thumb }
-  in case asset of
-    Just a  -> pure a
+  in case a of
+    Just a'  -> pure a'
     Nothing -> Invalid [ "Could not retrieve asset info" ])

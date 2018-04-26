@@ -9,3 +9,7 @@ implements image api of Nasa images based on
     search results with filled asset information
 
 Example usage in `test/Main.purs`
+
+## Install
+
+You have to install `xhr2` or just run npm install.

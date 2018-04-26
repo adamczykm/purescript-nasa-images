@@ -7,6 +7,7 @@ import Data.FormURLEncoded (FormURLEncoded, fromArray)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap)
 import Data.Record.ShowRecord (showRecord)
+import Data.These (These)
 import Data.Tuple (Tuple(..))
 
 newtype Request = Request
@@ -18,6 +19,7 @@ newtype Request = Request
 newtype Result c = Result
   { href :: String
   , items :: Array (Item c)
+  , pagination ∷ These String String
   , metadata :: Metadata
   }
 
