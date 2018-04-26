@@ -4,9 +4,10 @@ import Prelude
 
 import Data.Foldable (intercalate)
 import Data.FormURLEncoded (FormURLEncoded, fromArray)
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
-import Data.Newtype (class Newtype, unwrap)
-import Data.Record.ShowRecord (showRecord)
+import Data.Newtype (class Newtype)
 import Data.These (These)
 import Data.Tuple (Tuple(..))
 
@@ -35,14 +36,18 @@ newtype Item c = Item
   , asset :: c
   }
 
-derive instance newtypeItem :: Newtype (Item c) _
-instance showSearchItem :: Show c => Show (Item c) where show = unwrap >>> showRecord
+derive instance newtypeItem ∷ Newtype (Item c) _
+derive instance genericItem ∷ Generic (Item c) _
+instance showSearchItem :: Show c ⇒ Show (Item c) where
+  show = genericShow
 
 derive instance newtypeMetadata :: Newtype Metadata _
-instance showMetadata :: Show Metadata where show = unwrap >>> showRecord
+derive instance genericMetadata :: Generic Metadata _
+instance showMetadata :: Show Metadata where show = genericShow
 
-derive instance newtypeResult :: Newtype (Result c) _
-instance showSearchResult :: Show c => Show (Result c) where show = unwrap >>> showRecord
+derive instance newtypeResult ∷ Newtype (Result c) _
+derive instance genericResult ∷ Generic (Result c) _
+instance showSearchResult :: (Show c) => Show (Result c) where show = genericShow
 
 toUrlEncoded :: Request -> FormURLEncoded
 toUrlEncoded (Request req) = fromArray
