@@ -20,7 +20,7 @@ newtype Request = Request
 newtype Result c = Result
   { href :: String
   , items :: Array (Item c)
-  , pagination ∷ These String String
+  , pagination :: These String String
   , metadata :: Metadata
   }
 
@@ -36,17 +36,17 @@ newtype Item c = Item
   , asset :: c
   }
 
-derive instance newtypeItem ∷ Newtype (Item c) _
-derive instance genericItem ∷ Generic (Item c) _
-instance showSearchItem :: Show c ⇒ Show (Item c) where
+derive instance newtypeItem :: Newtype (Item c) _
+derive instance genericItem :: Generic (Item c) _
+instance showSearchItem :: Show c => Show (Item c) where
   show = genericShow
 
 derive instance newtypeMetadata :: Newtype Metadata _
 derive instance genericMetadata :: Generic Metadata _
 instance showMetadata :: Show Metadata where show = genericShow
 
-derive instance newtypeResult ∷ Newtype (Result c) _
-derive instance genericResult ∷ Generic (Result c) _
+derive instance newtypeResult :: Newtype (Result c) _
+derive instance genericResult :: Generic (Result c) _
 instance showSearchResult :: (Show c) => Show (Result c) where show = genericShow
 
 toUrlEncoded :: Request -> FormURLEncoded

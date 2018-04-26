@@ -2,24 +2,23 @@ module API.NasaImages.Asset where
 
 import Prelude
 
-import Data.Record.ShowRecord (showRecord)
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
 
 newtype Image dim = Image
   { url :: String
   , height :: dim
   , width :: dim
   }
-
-instance showImage :: Show dim => Show (Image dim) where
-  show (Image i) = showRecord i
+derive instance genericImage :: Generic (Image dim) _
+instance showImage :: Show dim => Show (Image dim) where show = genericShow
 
 newtype Asset dim = Asset
   { original :: Image dim
   , thumb :: String
   }
-
-instance showAsset :: Show dim => Show (Asset dim) where
-  show (Asset r) = showRecord r
+derive instance genericAsset :: Generic (Asset dim) _
+instance showAsset :: Show dim => Show (Asset dim) where show = genericShow
 
 withDimensions :: forall a b. { width :: b, height :: b } -> Asset a -> Asset b
 withDimensions { width, height } (Asset a) =
