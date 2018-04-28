@@ -33,6 +33,7 @@ newtype Item c = Item
   , description :: String
   , keywords :: Array String
   , nasaId :: String
+  , preview ∷ Maybe String
   , asset :: c
   }
 

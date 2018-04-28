@@ -9,10 +9,8 @@ import Data.Argonaut (Json, jsonParser)
 import Data.Either (Either(..))
 import Data.Foldable (find)
 import Data.Maybe (Maybe(..))
-import Data.Record (insert)
 import Data.Record.Fold (collect)
 import Data.String (Pattern(..), contains)
-import Data.Symbol (SProxy(..))
 import Data.These (These(..))
 import Data.Tuple (Tuple(..))
 import Network.HTTP.Affjax (AffjaxResponse)
@@ -46,14 +44,21 @@ metadata = Metadata <$> (collect { "totalHits": field "total_hits" int })
 
 searchItem :: forall m. Monad m => JsValidation m (Item String)
 searchItem = Item <$> (
-  insert (SProxy :: SProxy "asset") <$>
-    (field "href" string) <*>
-    (field "data" $ elem 0 $ collect
-      { title: field "title" string
-      , description: field "description" string
-      , keywords: optionalField "keywords" $ arrayOf string
-      , nasaId: field "nasa_id" string
-      }))
+  { asset: _
+  , description: _
+  , keywords: _
+  , nasaId: _
+  , preview: _
+  , title: _
+  }
+  <$> field "href" string
+  <*> fromData "description" string
+  <*> (field "data" $ elem 0 $ (optionalField "keywords" $ arrayOf string))
+  <*> fromData "nasa_id" string
+  <*> (Just <$> (field "links" $ elem 0 $ field "href" string) <|> pure Nothing)
+  <*> fromData "title" string)
+  where
+  fromData n v = field "data" $ elem 0 $ field n v
 
 these
   :: forall a b m
