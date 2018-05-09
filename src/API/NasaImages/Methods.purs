@@ -3,7 +3,7 @@ module API.NasaImages.Methods where
 import Prelude
 
 import API.NasaImages.Asset (Asset, withDimensions)
-import API.NasaImages.Search (Item(..), Request(..), Result(..), toUrlEncoded)
+import API.NasaImages.Search (Item(Item), Request, Result(Result), toUrlEncoded)
 import API.NasaImages.Validation (affjaxJson, asset, dimensions, findStr, searchResult, stringifyErrs)
 import Control.Monad.Aff (Aff)
 import Control.Parallel (parTraverse)
@@ -23,7 +23,7 @@ buildRequest r =
   in defaultRequest { url = "https://images-api.nasa.gov/search?" <> url, method = Left GET }
 
 search :: forall e. Validation (Aff (ajax :: AJAX | e)) (Array String) Request (Result String)
-search = hoistFnMV $ \req@(Request r) -> do
+search = hoistFnMV $ \req -> do
   resp <- affjax (buildRequest req)
   runValidation (affjaxJson >>> stringifyErrs (field "collection" (searchResult req))) resp
 
