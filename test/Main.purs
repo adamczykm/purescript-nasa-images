@@ -15,6 +15,7 @@ example :: Request
 example = Request
   { query : Just "apollo 11"
   , description : Just "moon landing"
+  , page : 1
   , keywords : []
   }
 

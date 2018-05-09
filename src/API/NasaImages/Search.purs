@@ -13,6 +13,7 @@ import Data.Tuple (Tuple(..))
 
 newtype Request = Request
   { query :: Maybe String
+  , page :: Int
   , description :: Maybe String
   , keywords :: Array String
   }
@@ -54,6 +55,7 @@ toUrlEncoded :: Request -> FormURLEncoded
 toUrlEncoded (Request req) = fromArray
   [ Tuple "q" req.query
   , Tuple "description" req.description
+  , Tuple "page" (Just $ show req.page)
   , Tuple "keywords" (case intercalate "," req.keywords of
     "" -> Nothing
     s  -> Just s)

@@ -76,7 +76,7 @@ pagination = these (page "prev") (page "next")
   where
   page rel  = (Tuple <$> field "rel" string <*> field "href" string) >>> hoistFnV (case _ of
     (Tuple r h) | r == rel -> pure h
-    (Tuple r _) -> fail ("Invalid next link rel: " <> r))
+    (Tuple r _) -> fail ("Invalid " <> rel <> " link rel: " <> r))
 
 searchResult :: forall m. Monad m => JsValidation m (Result String)
 searchResult = Result <$> (collect
