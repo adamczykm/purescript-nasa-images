@@ -17,11 +17,15 @@ newtype Request = Request
   , description :: Maybe String
   , keywords :: Array String
   }
+derive instance newtypeRequest :: Newtype Request _
+derive instance genericRequest :: Generic Request _
+instance showRequest :: Show Request where
+  show = genericShow
 
 newtype Result c = Result
   { href :: String
   , items :: Array (Item c)
-  , pagination :: These String String
+  , pagination :: These Request Request
   , metadata :: Metadata
   }
 

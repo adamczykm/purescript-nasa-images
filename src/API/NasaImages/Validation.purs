@@ -3,7 +3,7 @@ module API.NasaImages.Validation where
 import Prelude
 
 import API.NasaImages.Asset (Asset(..), Image(..))
-import API.NasaImages.Search (Item(..), Metadata(..), Result(..))
+import API.NasaImages.Search (Item(..), Metadata(..), Request(..), Result(..))
 import Control.Alt ((<|>))
 import Data.Argonaut (Json, jsonParser)
 import Data.Either (Either(..))
@@ -71,18 +71,18 @@ these vA vB
   <|> This <$> elem 0 vA
   <|> That <$> elem 0 vB
 
-pagination :: forall m. Monad m => JsValidation m (These String String)
-pagination = these (page "prev") (page "next")
+pagination :: forall m. Monad m => Request -> JsValidation m (These Request Request)
+pagination (Request req) = these (page "prev" (_ - 1)) (page "next" (_ + 1))
   where
-  page rel  = (Tuple <$> field "rel" string <*> field "href" string) >>> hoistFnV (case _ of
-    (Tuple r h) | r == rel -> pure h
+  page rel p = (Tuple <$> field "rel" string <*> field "href" string) >>> hoistFnV (case _ of
+    (Tuple r h) | r == rel -> pure (Request req{ page = p req.page })
     (Tuple r _) -> fail ("Invalid " <> rel <> " link rel: " <> r))
 
-searchResult :: forall m. Monad m => JsValidation m (Result String)
-searchResult = Result <$> (collect
+searchResult :: forall m. Monad m => Request -> JsValidation m (Result String)
+searchResult req = Result <$> (collect
   { href: field "href" string
   , items: field "items" $ arrayOf searchItem
-  , pagination: field "links" pagination
+  , pagination: field "links" (pagination req)
   , metadata: field "metadata" $ metadata
   })
 
