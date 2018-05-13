@@ -6,11 +6,12 @@ import API.NasaImages.Asset (Asset, withDimensions)
 import API.NasaImages.Search (Item(Item), Request, Result(Result), toUrlEncoded)
 import API.NasaImages.Validation (affjaxJson, asset, dimensions, findStr, searchResult, stringifyErrs)
 import Control.Monad.Aff (Aff)
+import Control.Monad.Error.Class (catchError)
 import Control.Parallel (parTraverse)
 import Data.Either (Either(..))
 import Data.FormURLEncoded (encode)
 import Data.HTTP.Method (Method(..))
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), maybe)
 import Data.Record.Fold (rMap)
 import Data.Traversable (sequence)
 import Network.HTTP.Affjax (AJAX, AffjaxRequest, affjax, defaultRequest, get)
@@ -24,8 +25,10 @@ buildRequest r =
 
 search :: forall e. Validation (Aff (ajax :: AJAX | e)) (Array String) Request (Result String)
 search = hoistFnMV $ \req -> do
-  resp <- affjax (buildRequest req)
-  runValidation (affjaxJson >>> stringifyErrs (field "collection" (searchResult req))) resp
+  resp <- (Just <$> affjax (buildRequest req)) `catchError` \_ → pure Nothing
+  runValidation (affjaxRequest >>> affjaxJson >>> stringifyErrs (field "collection" (searchResult req))) resp
+  where
+  affjaxRequest = hoistFnV (maybe (Invalid ["AJAX request failed"]) (Valid []))
 
 getDimensions
   :: forall e
