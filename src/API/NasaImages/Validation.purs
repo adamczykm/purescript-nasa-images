@@ -22,9 +22,6 @@ import Network.HTTP.StatusCode (StatusCode(..))
 import Polyform.Validation (V(Invalid, Valid), Validation, hoistFn, hoistFnMV, hoistFnV, lmapValidation)
 import Validators.Json (JsValidation, arrayOf, elem, fail, field, int, optionalField, string)
 
-type AffjaxValidation m a = Validation m (Array String) (AffjaxRequest String) a
-type AffjaxJson m = AffjaxValidation m Json
-
 affjaxRequest
   :: forall req eff
    . Requestable req
@@ -35,8 +32,8 @@ affjaxRequest
       String
 affjaxRequest = validateStatus <<< validateAffjax
   where
-  validateAffjax = hoistFnMV $ \url → do
-    (Valid [] <$> affjax url) `catchError` (const $ (pure (Invalid ["AJAX request failed"])))
+  validateAffjax = hoistFnMV $ \req → do
+    (Valid [] <$> affjax req) `catchError` (const $ (pure (Invalid ["AJAX request failed"])))
   validateStatus = hoistFnV $ \response -> case response.status of
     StatusCode 200 -> Valid [] response.response
     StatusCode s ->
