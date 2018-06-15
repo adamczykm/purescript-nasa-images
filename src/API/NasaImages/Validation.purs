@@ -30,6 +30,8 @@ import Validators.Json (JsError, JsValidation, arrayOf, elem, field, int, option
 type JsonErrorRow (err :: # Type) = (parsingError :: String | err)
 type PaginationErrorRow (err :: # Type) = (invalidLinkError :: Array String | err)
 
+type SearchErrorRow err = (PaginationErrorRow(JsonErrorRow(JsError(HttpErrorRow(AffjaxErrorRow err)))))
+
 affjaxRequest
   :: forall req eff errs
    . Requestable req
@@ -136,13 +138,15 @@ dimensions = { width: _, height: _ }
     <|> field "File:ImageHeight" int
     <|> field "EXIF:ExifImageWidth" int)
 
-findStr :: forall m. Monad m => String -> Validation m (Array String) (Array String) String
+-- TODO better errors
+
+findStr :: forall m err. Monad m => String -> Validation m (Array (Variant (SearchErrorRow err))) (Array String) String
 findStr s = hoistFnV $ \arr ->
   case find (contains $ Pattern s) arr of
-    Nothing -> Invalid [ "Could not find string containing pattern: " <> s ]
+    Nothing -> Invalid $ singleton (inj (SProxy :: SProxy "parsingError") s) --Invalid [ "Could not find string containing pattern: " <> s 
     Just a -> pure a
 
-asset :: forall m. Monad m => Validation m (Array String) (Array String) (Asset Unit)
+asset :: forall m err. Monad m => Validation m (Array (Variant (SearchErrorRow err))) (Array String) (Asset Unit)
 asset = hoistFnV (\urls ->
   let
     a = do
@@ -151,4 +155,4 @@ asset = hoistFnV (\urls ->
       pure $ Asset { original: Image { url: orig, width : unit, height : unit }, thumb: thumb }
   in case a of
     Just a'  -> pure a'
-    Nothing -> Invalid [ "Could not retrieve asset info" ])
+    Nothing -> Invalid $ singleton (inj (SProxy :: SProxy "parsingError") "Error"))
