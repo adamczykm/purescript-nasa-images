@@ -6,7 +6,6 @@ import API.NasaImages.Asset (Asset(..), Image(..))
 import API.NasaImages.Search (Item(..), Metadata(..), Request(..), Result(..))
 import Control.Alt ((<|>))
 import Control.Monad.Aff (Aff)
-import Control.Monad.Error.Class (catchError)
 import Data.Argonaut (Json, jsonParser)
 import Data.Array (singleton)
 import Data.Either (Either(..))
@@ -21,16 +20,23 @@ import Data.Tuple (Tuple(..))
 import Data.Variant (Variant, inj)
 import Network.HTTP.Affjax (AJAX, AffjaxRequest, defaultRequest)
 import Network.HTTP.Affjax.Request (class Requestable)
-import Network.HTTP.StatusCode (StatusCode(..))
-import Polyform.Validation (V(Invalid, Valid), Validation, hoistFn, hoistFnMV, hoistFnV, lmapValidation)
-import Validators.Affjax (AffjaxErrorRow, HttpErrorRow, isStatusOK, status)
-import Validators.Affjax (affjax)
+import Polyform.Validation (V(Invalid, Valid), Validation, hoistFn, hoistFnV, lmapValidation)
+import Validators.Affjax (AffjaxErrorRow, HttpErrorRow, isStatusOK, status, affjax)
 import Validators.Json (JsError, JsValidation, arrayOf, elem, field, int, optionalField, string)
 
 type JsonErrorRow (err :: # Type) = (parsingError :: String | err)
 type PaginationErrorRow (err :: # Type) = (invalidLinkError :: Array String | err)
-
-type SearchErrorRow err = (PaginationErrorRow(JsonErrorRow(JsError(HttpErrorRow(AffjaxErrorRow err)))))
+type PatternMatchingErrorRow (err :: # Type) = (patternNotFound :: String | err)
+type AssetErrorRow(err :: # Type) = (assetError :: String | err)
+type SearchErrorRow err = 
+  ( PaginationErrorRow
+  ( JsonErrorRow
+  ( JsError
+  ( PatternMatchingErrorRow
+  ( AssetErrorRow
+  ( HttpErrorRow
+  ( AffjaxErrorRow err
+  )))))))
 
 affjaxRequest
   :: forall req eff errs
@@ -114,14 +120,26 @@ these vA vB
   <|> This <$>elem 0 vA
   <|> That <$> elem 0 vB
 
-pagination :: forall m err. Monad m => Request -> JsValidation m (PaginationErrorRow err) (These Request Request)
+pagination 
+  :: forall m err
+   . Monad m 
+  => Request 
+  -> JsValidation m 
+      (PaginationErrorRow err) 
+      (These Request Request)
 pagination (Request req) = these (page "prev" (_ - 1)) (page "next" (_ + 1))
   where
   page rel p = (Tuple <$> field "rel" string <*> field "href" string) >>> hoistFnV (case _ of
     (Tuple r h) | r == rel -> pure (Request req{ page = p req.page })
     (Tuple r _) -> Invalid $ singleton (inj (SProxy :: SProxy "invalidLinkError") [rel, r]))
 
-searchResult :: forall m err. Monad m => Request -> JsValidation m (PaginationErrorRow err) (Result String)
+searchResult 
+  :: forall m err
+   . Monad m 
+  => Request 
+  -> JsValidation m 
+      (PaginationErrorRow err) 
+      (Result String)
 searchResult req = Result <$> (collect
   { href: field "href" string
   , items: field "items" $ arrayOf searchItem
@@ -138,15 +156,26 @@ dimensions = { width: _, height: _ }
     <|> field "File:ImageHeight" int
     <|> field "EXIF:ExifImageWidth" int)
 
--- TODO better errors
-
-findStr :: forall m err. Monad m => String -> Validation m (Array (Variant (SearchErrorRow err))) (Array String) String
+findStr 
+  :: forall m err
+   . Monad m 
+  => String 
+  -> Validation m 
+      (Array (Variant (PatternMatchingErrorRow err))) 
+      (Array String) 
+      String
 findStr s = hoistFnV $ \arr ->
   case find (contains $ Pattern s) arr of
-    Nothing -> Invalid $ singleton (inj (SProxy :: SProxy "parsingError") s) --Invalid [ "Could not find string containing pattern: " <> s 
+    Nothing -> Invalid $ singleton (inj (SProxy :: SProxy "patternNotFound") s)
     Just a -> pure a
 
-asset :: forall m err. Monad m => Validation m (Array (Variant (SearchErrorRow err))) (Array String) (Asset Unit)
+asset 
+  :: forall m err
+   . Monad m 
+  => Validation m 
+      (Array (Variant (AssetErrorRow err))) 
+      (Array String) 
+      (Asset Unit)
 asset = hoistFnV (\urls ->
   let
     a = do
@@ -155,4 +184,4 @@ asset = hoistFnV (\urls ->
       pure $ Asset { original: Image { url: orig, width : unit, height : unit }, thumb: thumb }
   in case a of
     Just a'  -> pure a'
-    Nothing -> Invalid $ singleton (inj (SProxy :: SProxy "parsingError") "Error"))
+    Nothing -> Invalid $ singleton (inj (SProxy :: SProxy "assetError") "Couldn't retrieve asset info."))

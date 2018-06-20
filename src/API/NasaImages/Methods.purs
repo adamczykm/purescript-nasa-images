@@ -4,7 +4,7 @@ import Prelude
 
 import API.NasaImages.Asset (Asset, withDimensions)
 import API.NasaImages.Search (Item(Item), Request, Result(Result), toUrlEncoded)
-import API.NasaImages.Validation (SearchErrorRow, affjaxJson, asset, dimensions, findStr, getJson, searchResult, stringifyErrs)
+import API.NasaImages.Validation (SearchErrorRow, affjaxJson, asset, dimensions, findStr, getJson, searchResult)
 import Control.Alt ((<|>))
 import Control.Monad.Aff (Aff)
 import Control.Parallel (parTraverse)
@@ -30,7 +30,10 @@ search = hoistFnMV $ \req -> runValidation
 
 getDimensions
   :: forall e err
-   . Validation (Aff (ajax :: AJAX | e)) (Array (Variant (SearchErrorRow err))) String { width :: Int, height :: Int }
+   . Validation 
+      (Aff (ajax :: AJAX | e))  
+      (Array (Variant (SearchErrorRow err))) 
+      String { width :: Int, height :: Int }
 getDimensions = (getJson >>> dimensions)
 
 retrieve :: forall e err. Validation (Aff (ajax :: AJAX | e)) (Array (Variant (SearchErrorRow err))) String (Asset (Maybe Int))
@@ -41,7 +44,11 @@ retrieve = getJson >>> (arrayOf string) >>> (withDimensions
 
 searchAndRetrieve
   :: forall e err
-   . Validation (Aff (ajax :: AJAX | e)) (Array (Variant (SearchErrorRow err))) Request (Result (Asset (Maybe Int)))
+   . Validation 
+      (Aff (ajax :: AJAX | e)) 
+      (Array (Variant (SearchErrorRow err))) 
+      Request 
+      (Result (Asset (Maybe Int)))
 searchAndRetrieve = search >>> (hoistFnMV $ \(Result r) -> do
   assets <- sequence <$> parTraverse (\(Item i) -> do
     asset <- runValidation retrieve i.asset
