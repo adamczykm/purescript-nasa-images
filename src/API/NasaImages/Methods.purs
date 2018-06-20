@@ -4,7 +4,7 @@ import Prelude
 
 import API.NasaImages.Asset (Asset, withDimensions)
 import API.NasaImages.Search (Item(Item), Request, Result(Result), toUrlEncoded)
-import API.NasaImages.Validation (SearchErrorRow, affjaxJson, asset, dimensions, findStr, getJson, searchResult)
+import API.NasaImages.Validation (SearchErrorRow, asset, dimensions, findStr, getJson, searchResult)
 import Control.Alt ((<|>))
 import Control.Monad.Aff (Aff)
 import Control.Parallel (parTraverse)
@@ -17,6 +17,7 @@ import Data.Traversable (sequence)
 import Data.Variant (Variant)
 import Network.HTTP.Affjax (AJAX, AffjaxRequest, defaultRequest)
 import Polyform.Validation (Validation, hoistFn, hoistFnMV, runValidation)
+import Validators.Affjax (affjaxJson)
 import Validators.Json (arrayOf, field, string)
 
 buildRequest :: Request -> AffjaxRequest Unit
@@ -26,7 +27,7 @@ buildRequest r =
 
 search :: forall e err. Validation (Aff (ajax :: AJAX | e)) (Array (Variant (SearchErrorRow err))) Request (Result String)
 search = hoistFnMV $ \req -> runValidation
-  (hoistFn buildRequest >>> affjaxJson >>> (field "collection" (searchResult req))) req
+  ((field "collection" (searchResult req)) <<< affjaxJson <<< hoistFn buildRequest) req
 
 getDimensions
   :: forall e err

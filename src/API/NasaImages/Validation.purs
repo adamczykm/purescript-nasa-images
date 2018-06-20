@@ -6,7 +6,7 @@ import API.NasaImages.Asset (Asset(..), Image(..))
 import API.NasaImages.Search (Item(..), Metadata(..), Request(..), Result(..))
 import Control.Alt ((<|>))
 import Control.Monad.Aff (Aff)
-import Data.Argonaut (Json, jsonParser)
+import Data.Argonaut (Json)
 import Data.Array (singleton)
 import Data.Either (Either(..))
 import Data.Foldable (find)
@@ -18,10 +18,9 @@ import Data.String (Pattern(..), contains)
 import Data.These (These(..))
 import Data.Tuple (Tuple(..))
 import Data.Variant (Variant, inj)
-import Network.HTTP.Affjax (AJAX, AffjaxRequest, defaultRequest)
-import Network.HTTP.Affjax.Request (class Requestable)
-import Polyform.Validation (V(Invalid, Valid), Validation, hoistFn, hoistFnV, lmapValidation)
-import Validators.Affjax (AffjaxErrorRow, HttpErrorRow, isStatusOK, status, affjax)
+import Network.HTTP.Affjax (AJAX, defaultRequest)
+import Polyform.Validation (V(Invalid), Validation, hoistFn, hoistFnV, lmapValidation)
+import Validators.Affjax (AffjaxErrorRow, HttpErrorRow, affjaxJson)
 import Validators.Json (JsError, JsValidation, arrayOf, elem, field, int, optionalField, string)
 
 type JsonErrorRow (err :: # Type) = (parsingError :: String | err)
@@ -37,37 +36,6 @@ type SearchErrorRow err =
   ( HttpErrorRow
   ( AffjaxErrorRow err
   )))))))
-
-affjaxRequest
-  :: forall req eff errs
-   . Requestable req
-  => Validation
-      (Aff (ajax :: AJAX | eff))
-      (Array (Variant (HttpErrorRow(AffjaxErrorRow errs))))
-      (AffjaxRequest req)
-      String
-affjaxRequest = (status isStatusOK) <<< affjax
-
-valJson 
-  :: forall m err
-   . Monad m 
-  => Validation m
-      (Array (Variant (JsonErrorRow err)))
-      String
-      Json
-valJson = hoistFnV \response -> case jsonParser response of
-  Right js -> Valid [] js
-  Left error -> Invalid  $ singleton (inj (SProxy :: SProxy "parsingError") error)
-
-affjaxJson
-  :: forall eff req errs
-   . Requestable req
-  => Validation
-      (Aff ( ajax :: AJAX | eff))
-      (Array (Variant (HttpErrorRow(AffjaxErrorRow (JsonErrorRow errs)))))
-      (AffjaxRequest req)
-      Json
-affjaxJson = valJson <<< affjaxRequest
 
 getJson
   :: forall eff errs
