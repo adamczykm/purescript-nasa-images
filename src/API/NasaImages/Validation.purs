@@ -6,58 +6,42 @@ import API.NasaImages.Asset (Asset(..), Image(..))
 import API.NasaImages.Search (Item(..), Metadata(..), Request(..), Result(..))
 import Control.Alt ((<|>))
 import Control.Monad.Aff (Aff)
-import Control.Monad.Error.Class (catchError)
-import Data.Argonaut (Json, jsonParser)
+import Data.Argonaut (Json)
+import Data.Array (singleton)
 import Data.Either (Either(..))
 import Data.Foldable (find)
+import Data.Functor.Variant (SProxy(..))
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..))
 import Data.Record.Fold (collect)
 import Data.String (Pattern(..), contains)
 import Data.These (These(..))
 import Data.Tuple (Tuple(..))
-import Network.HTTP.Affjax (AJAX, AffjaxRequest, affjax, defaultRequest)
-import Network.HTTP.Affjax.Request (class Requestable)
-import Network.HTTP.StatusCode (StatusCode(..))
-import Polyform.Validation (V(Invalid, Valid), Validation, hoistFn, hoistFnMV, hoistFnV, lmapValidation)
-import Validators.Json (JsValidation, arrayOf, elem, fail, field, int, optionalField, string)
+import Data.Variant (Variant, inj)
+import Network.HTTP.Affjax (AJAX, defaultRequest)
+import Polyform.Validation (V(Invalid), Validation, hoistFn, hoistFnV, lmapValidation)
+import Validators.Affjax (AffjaxErrorRow, HttpErrorRow, affjaxJson)
+import Validators.Json (JsError, JsValidation, arrayOf, elem, field, int, optionalField, string)
 
-affjaxRequest
-  :: forall req eff
-   . Requestable req
-  => Validation
-      (Aff (ajax :: AJAX | eff))
-      (Array String)
-      (AffjaxRequest req)
-      String
-affjaxRequest = validateStatus <<< validateAffjax
-  where
-  validateAffjax = hoistFnMV $ \req → do
-    (Valid [] <$> affjax req) `catchError` (const $ (pure (Invalid ["AJAX request failed"])))
-  validateStatus = hoistFnV $ \response -> case response.status of
-    StatusCode 200 -> Valid [] response.response
-    StatusCode s ->
-      Invalid ["API bad response:\n" <> show s <> "\n" <> "\"" <> response.response <> "\""]
-
-affjaxJson
-  :: forall eff req
-   . Requestable req
-  => Validation
-      (Aff ( ajax :: AJAX | eff))
-      (Array String)
-      (AffjaxRequest req)
-      Json
-affjaxJson = parseJson <<< affjaxRequest
-  where
-  parseJson = hoistFnV $ \response -> case jsonParser response of
-    Right json -> Valid [] json
-    Left e -> Invalid ["Json parsing error: " <> e]
+type JsonErrorRow (err :: # Type) = (parsingError :: String | err)
+type PaginationErrorRow (err :: # Type) = (invalidLinkError :: Array String | err)
+type PatternMatchingErrorRow (err :: # Type) = (patternNotFound :: String | err)
+type AssetErrorRow(err :: # Type) = (assetError :: String | err)
+type SearchErrorRow err = 
+  ( PaginationErrorRow
+  ( JsonErrorRow
+  ( JsError
+  ( PatternMatchingErrorRow
+  ( AssetErrorRow
+  ( HttpErrorRow
+  ( AffjaxErrorRow err
+  )))))))
 
 getJson
-  :: forall eff
+  :: forall eff errs
    . Validation
       (Aff ( ajax :: AJAX | eff))
-      (Array String)
+      (Array (Variant (HttpErrorRow(AffjaxErrorRow (JsonErrorRow errs)))))
       String
       Json
 getJson =
@@ -71,10 +55,10 @@ stringifyErrs
   => Validation m (Array e) a b -> Validation m (Array String) a b
 stringifyErrs = lmapValidation (map show)
 
-metadata :: forall m. Monad m => JsValidation m Metadata
+metadata :: forall m err. Monad m => JsValidation m err Metadata
 metadata = Metadata <$> (collect { "totalHits": field "total_hits" int })
 
-searchItem :: forall m. Monad m => JsValidation m (Item String)
+searchItem :: forall m err. Monad m => JsValidation m err (Item String)
 searchItem = Item <$> (
   { asset: _
   , description: _
@@ -92,25 +76,38 @@ searchItem = Item <$> (
   where
   fromData n v = field "data" $ elem 0 $ field n v
 
+
 these
-  :: forall a b m
+  :: forall a b m err
    . Monad m
-  => JsValidation m a
-  -> JsValidation m b
-  -> JsValidation m (These a b)
+  => JsValidation m err a
+  -> JsValidation m err b
+  -> JsValidation m err (These a b)
 these vA vB
   = Both <$> (elem 0 vA) <*> (elem 1 vB)
-  <|> This <$> elem 0 vA
+  <|> This <$>elem 0 vA
   <|> That <$> elem 0 vB
 
-pagination :: forall m. Monad m => Request -> JsValidation m (These Request Request)
+pagination 
+  :: forall m err
+   . Monad m 
+  => Request 
+  -> JsValidation m 
+      (PaginationErrorRow err) 
+      (These Request Request)
 pagination (Request req) = these (page "prev" (_ - 1)) (page "next" (_ + 1))
   where
   page rel p = (Tuple <$> field "rel" string <*> field "href" string) >>> hoistFnV (case _ of
     (Tuple r h) | r == rel -> pure (Request req{ page = p req.page })
-    (Tuple r _) -> fail ("Invalid " <> rel <> " link rel: " <> r))
+    (Tuple r _) -> Invalid $ singleton (inj (SProxy :: SProxy "invalidLinkError") [rel, r]))
 
-searchResult :: forall m. Monad m => Request -> JsValidation m (Result String)
+searchResult 
+  :: forall m err
+   . Monad m 
+  => Request 
+  -> JsValidation m 
+      (PaginationErrorRow err) 
+      (Result String)
 searchResult req = Result <$> (collect
   { href: field "href" string
   , items: field "items" $ arrayOf searchItem
@@ -118,7 +115,7 @@ searchResult req = Result <$> (collect
   , metadata: field "metadata" $ metadata
   })
 
-dimensions :: forall m. Monad m => JsValidation m { width :: Int, height :: Int }
+dimensions :: forall m err. Monad m => JsValidation m err { width :: Int, height :: Int }
 dimensions = { width: _, height: _ } 
   <$> ( field "EXIF:ImageWidth" int
     <|> field "File:ImageWidth" int
@@ -127,13 +124,26 @@ dimensions = { width: _, height: _ }
     <|> field "File:ImageHeight" int
     <|> field "EXIF:ExifImageWidth" int)
 
-findStr :: forall m. Monad m => String -> Validation m (Array String) (Array String) String
+findStr 
+  :: forall m err
+   . Monad m 
+  => String 
+  -> Validation m 
+      (Array (Variant (PatternMatchingErrorRow err))) 
+      (Array String) 
+      String
 findStr s = hoistFnV $ \arr ->
   case find (contains $ Pattern s) arr of
-    Nothing -> Invalid [ "Could not find string containing pattern: " <> s ]
+    Nothing -> Invalid $ singleton (inj (SProxy :: SProxy "patternNotFound") s)
     Just a -> pure a
 
-asset :: forall m. Monad m => Validation m (Array String) (Array String) (Asset Unit)
+asset 
+  :: forall m err
+   . Monad m 
+  => Validation m 
+      (Array (Variant (AssetErrorRow err))) 
+      (Array String) 
+      (Asset Unit)
 asset = hoistFnV (\urls ->
   let
     a = do
@@ -142,4 +152,4 @@ asset = hoistFnV (\urls ->
       pure $ Asset { original: Image { url: orig, width : unit, height : unit }, thumb: thumb }
   in case a of
     Just a'  -> pure a'
-    Nothing -> Invalid [ "Could not retrieve asset info" ])
+    Nothing -> Invalid $ singleton (inj (SProxy :: SProxy "assetError") "Couldn't retrieve asset info."))
