@@ -4,6 +4,7 @@ import Prelude
 
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
+import Data.Newtype (class Newtype)
 
 newtype Image dim = Image
   { url :: String
@@ -11,6 +12,7 @@ newtype Image dim = Image
   , width :: dim
   }
 derive instance genericImage :: Generic (Image dim) _
+derive instance newtypeImage :: Newtype (Image dim) _
 instance showImage :: Show dim => Show (Image dim) where show = genericShow
 
 newtype Asset dim = Asset
@@ -18,6 +20,7 @@ newtype Asset dim = Asset
   , thumb :: String
   }
 derive instance genericAsset :: Generic (Asset dim) _
+derive instance newtypeAsset :: Newtype (Asset dim) _
 instance showAsset :: Show dim => Show (Asset dim) where show = genericShow
 
 withDimensions :: forall a b. { width :: b, height :: b } -> Asset a -> Asset b
